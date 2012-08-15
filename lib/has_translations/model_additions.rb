@@ -3,8 +3,8 @@ module HasTranslations
     extend ActiveSupport::Concern
 
     module ClassMethods
-      def translated(locale)
-        where(["#{self.has_translations_options[:translation_class].table_name}.locale = ?", locale.to_s]).joins(:translations)
+      def translated(language_id)
+        where(["#{self.has_translations_options[:translation_class].table_name}.language_id = ?", language_id]).joins(:translations)
       end
 
       def has_translations(*attrs)
@@ -31,15 +31,15 @@ module HasTranslations
         # associations, validations and scope definitions
         has_many :translations, :class_name => translation_class_name, :dependent => :destroy, :autosave => options[:autosave]
         options[:translation_class].belongs_to belongs_to
-        options[:translation_class].validates_presence_of :locale
-        options[:translation_class].validates_uniqueness_of :locale, :scope => :"#{belongs_to}_id"
+        options[:translation_class].validates_presence_of :language_id
+        options[:translation_class].validates_uniqueness_of :language_id, :scope => :"#{belongs_to}_id"
 
         # Optionals delegated readers
         if options[:reader]
           attrs.each do |name|
             send :define_method, name do |*args|
-              locale = args.first || I18n.locale
-              translation = self.translation(locale)
+              language_id = args.first || get_language_id_from_i18n
+              translation = self.translation(language_id)
               translation.try(name) || has_translations_options[:nil]
             end
           end
@@ -49,12 +49,12 @@ module HasTranslations
         if options[:writer]
           attrs.each do |name|
             send :define_method, "#{name}_before_type_cast" do
-              translation = self.translation(I18n.locale, false)
+              translation = self.translation(get_language_id_from_i18n, false)
               translation.try(name)
             end
 
             send :define_method, "#{name}=" do |value|
-              translation = find_or_build_translation(I18n.locale)
+              translation = find_or_build_translation(get_language_id_from_i18n)
               translation.send(:"#{name}=", value)
             end
           end
@@ -63,40 +63,41 @@ module HasTranslations
       end
     end
 
-    def find_or_create_translation(locale)
-      locale = locale.to_s
-      (find_translation(locale) || self.has_translations_options[:translation_class].new).tap do |t|
-        t.locale = locale
+    def find_or_create_translation(language_id)
+      (find_translation(language_id) || self.has_translations_options[:translation_class].new).tap do |t|
+        t.language_id = language_id
         t.send(:"#{self.class.model_name.demodulize.underscore.to_sym}_id=", self.id)
       end
     end
 
-    def find_or_build_translation(locale)
-      locale = locale.to_s
-      (find_translation(locale) || self.translations.build).tap do |t|
-        t.locale = locale
+    def find_or_build_translation(language_id)
+      (find_translation(language_id) || self.translations.build).tap do |t|
+        t.language_id = language_id
       end
     end
 
-    def translation(locale, fallback=has_translations_options[:fallback])
-      locale = locale.to_s
-      find_translation(locale) || (fallback && !translations.blank? ? translations.detect { |t| t.locale == I18n.default_locale.to_s } || translations.first : nil)
+    def translation(language_id, fallback=has_translations_options[:fallback])
+      find_translation(language_id) || (fallback && !translations.blank? ? translations.detect { |t| t.language_id == 1 } || translations.first : nil)
     end
 
     def all_translations
-      t = I18n.available_locales.map do |locale|
-        [locale, find_or_create_translation(locale)]
+      t = LANGUAGE_HASH.map do |l_str, l_id|
+        [l_id, find_or_create_translation(l_id)]
       end
       ActiveSupport::OrderedHash[t]
     end
 
-    def has_translation?(locale)
-      find_translation(locale).present?
+    def has_translation?(language_id)
+      find_translation(language_id).present?
     end
 
-    def find_translation(locale)
-      locale = locale.to_s
-      translations.detect { |t| t.locale == locale }
+    def find_translation(language_id)
+      translations.detect { |t| t.language_id == language_id } || translations[0]
+    end
+
+
+    def get_language_id_from_i18n
+      LANGUAGE_HASH[I18n.locale.to_s.split("-")[0].to_sym] || LANGUAGE_HASH[:en]
     end
   end
 end

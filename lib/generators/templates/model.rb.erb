@@ -1,5 +1,3 @@
 class <%= name.camelcase %> < ActiveRecord::Base
 
-  attr_accessor <%= attributes.map { |attribute| ":#{attribute.name}" }.join(', ') %>
-
 end
