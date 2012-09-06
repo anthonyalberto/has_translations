@@ -87,6 +87,10 @@ module HasTranslations
       ActiveSupport::OrderedHash[t]
     end
 
+    def form_translations
+      translations.length > 0 ? translations : all_translations.values
+    end
+
     def has_translation?(language_id)
       find_translation(language_id).present?
     end
