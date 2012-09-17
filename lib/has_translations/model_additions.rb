@@ -3,8 +3,21 @@ module HasTranslations
     extend ActiveSupport::Concern
 
     module ClassMethods
+
+      def translation_table
+        self.has_translations_options[:translation_class].table_name
+      end
+
+      def prefixed_language_id
+        "#{self.translation_table}.language_id"
+      end
+
       def translated(language_id)
-        where(["#{self.has_translations_options[:translation_class].table_name}.language_id = ?", language_id]).joins(:translations)
+        where(["#{prefixed_language_id} = ?", language_id]).joins(:translations)
+      end
+
+      def where_language_id(language_id)
+        translated(language_id)
       end
 
       def has_translations(*attrs)
