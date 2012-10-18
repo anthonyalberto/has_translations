@@ -13,7 +13,7 @@ module HasTranslations
       end
 
       def translated(language_id)
-        where(["#{prefixed_language_id} = ?", language_id]).joins(:translations)
+        where(["#{prefixed_language_id} = ?", language_id]).joins(:translations).readonly(false)
       end
 
       def where_language_id(language_id)
